@@ -15,6 +15,9 @@ namespace OPSKWA
         private int _commandStartPosition;
 
         public event Action<string>? OnCommandEntered;
+        public event Action<string>? OnLLMPromptEntered;
+
+
 
         public TerminalUtility(System.Windows.Controls.RichTextBox terminal)
         {
@@ -27,17 +30,30 @@ namespace OPSKWA
         {
             _terminal.PreviewKeyDown += new System.Windows.Input.KeyEventHandler(OnPreviewKeyDown);
         }
-
         private void OnPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
             if (e.Key == Key.Enter)
             {
                 e.Handled = true;
-                var command = GetCurrentCommand();
-                ProcessCommand(command);
+                var userInput = GetCurrentCommand();
+
+                if (string.IsNullOrWhiteSpace(userInput))
+                {
+                    ShowPromptWithoutClear();
+                    return;
+                }
+
+                // Check if it's a command or LLM prompt
+                if (userInput.StartsWith("/"))
+                {
+                    ProcessCommand(userInput);
+                }
+                else
+                {
+                    ProcessLLMPrompt(userInput);
+                }
                 return;
             }
-
             if (e.Key == Key.Back)
             {
                 if (IsCaretAtPrompt())
@@ -46,7 +62,6 @@ namespace OPSKWA
                     return;
                 }
             }
-
             if (e.Key == Key.Left)
             {
                 if (IsCaretAtPrompt())
@@ -55,10 +70,8 @@ namespace OPSKWA
                     return;
                 }
             }
-
             EnsureCaretAfterPrompt();
         }
-
         public void ShowPrompt()
         {
             if (_terminal.Document.Blocks.Count > 0)
@@ -66,6 +79,7 @@ namespace OPSKWA
                 _terminal.Document.Blocks.Clear();
             }
             var paragraph = new Paragraph();
+            paragraph.Margin = new System.Windows.Thickness(0);
             var promptRun = new Run(_prompt) { Foreground = System.Windows.Media.Brushes.LimeGreen };
             paragraph.Inlines.Add(promptRun);
 
@@ -73,7 +87,17 @@ namespace OPSKWA
             _terminal.CaretPosition = _terminal.Document.ContentEnd;
             _commandStartPosition = _terminal.Document.ContentStart.GetOffsetToPosition(_terminal.CaretPosition);
         }
+        public void ShowPromptWithoutClear()
+        {
+            var paragraph = new Paragraph();
+            paragraph.Margin = new System.Windows.Thickness(0);
+            var promptRun = new Run(_prompt) { Foreground = System.Windows.Media.Brushes.LimeGreen };
+            paragraph.Inlines.Add(promptRun);
 
+            _terminal.Document.Blocks.Add(paragraph);
+            _terminal.CaretPosition = _terminal.Document.ContentEnd;
+            _commandStartPosition = _terminal.Document.ContentStart.GetOffsetToPosition(_terminal.CaretPosition);
+        }
         private string GetCurrentCommand()
         {
             var paragraph = _terminal.Document.Blocks.LastBlock as Paragraph;
@@ -88,53 +112,50 @@ namespace OPSKWA
 
             return text.Trim();
         }
-
         private void ProcessCommand(string command)
         {
             if (string.IsNullOrWhiteSpace(command))
             {
-                ShowPrompt();
+                ShowPromptWithoutClear();
                 return;
             }
 
             OnCommandEntered?.Invoke(command);
 
-            ShowPrompt();
+            ShowPromptWithoutClear();
         }
-
+        private void ProcessLLMPrompt(string prompt)
+        {
+            OnLLMPromptEntered?.Invoke(prompt);
+        }
         public void WriteOutput(string text, System.Windows.Media.Brush color = null)
         {
             var paragraph = new Paragraph();
+            paragraph.Margin = new System.Windows.Thickness(0);
             var run = new Run(text) { Foreground = color ?? System.Windows.Media.Brushes.White };
             paragraph.Inlines.Add(run);
 
-            var lastBlock = _terminal.Document.Blocks.LastBlock;
-            _terminal.Document.Blocks.InsertBefore(lastBlock, paragraph);
+            _terminal.Document.Blocks.Add(paragraph);
 
             _terminal.CaretPosition = _terminal.Document.ContentEnd;
         }
-
         public void WriteError(string text)
         {
             WriteOutput(text, System.Windows.Media.Brushes.Red);
         }
-
         public void WriteSuccess(string text)
         {
             WriteOutput(text, System.Windows.Media.Brushes.LimeGreen);
         }
-
         public void WriteInfo(string text)
         {
             WriteOutput(text, System.Windows.Media.Brushes.Cyan);
         }
-
         public void Clear()
         {
             _terminal.Document.Blocks.Clear();
             ShowPrompt();
         }
-
         private bool IsCaretAtPrompt()
         {
             var paragraph = _terminal.Document.Blocks.LastBlock as Paragraph;
@@ -143,7 +164,6 @@ namespace OPSKWA
             var caretOffset = paragraph.ContentStart.GetOffsetToPosition(_terminal.CaretPosition);
             return caretOffset <= _prompt.Length;
         }
-
         private void EnsureCaretAfterPrompt()
         {
             if (IsCaretAtPrompt())

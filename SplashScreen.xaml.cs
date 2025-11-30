@@ -14,9 +14,6 @@ using System.Windows.Shapes;
 
 namespace OPSKWA
 {
-    /// <summary>
-    /// Interaction logic for SplashScreen.xaml
-    /// </summary>
     public partial class SplashScreen : Window
     {
         public SplashScreen()

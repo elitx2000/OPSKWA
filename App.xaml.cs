@@ -1,7 +1,6 @@
 ﻿using System.Configuration;
 using System.Data;
 using System.Windows;
-
 namespace OPSKWA
 {
     /// <summary>
@@ -13,12 +12,10 @@ namespace OPSKWA
         {
             base.OnStartup(e);
 
-            // Get the screen with the mouse cursor
             var point = new System.Drawing.Point(
                 System.Windows.Forms.Cursor.Position.X,
                 System.Windows.Forms.Cursor.Position.Y);
-
-            System.Windows.Forms.Screen targetScreen = null;
+            System.Windows.Forms.Screen? targetScreen = null;
             foreach (var scr in System.Windows.Forms.Screen.AllScreens)
             {
                 if (scr.Bounds.Contains(point))
@@ -27,19 +24,25 @@ namespace OPSKWA
                     break;
                 }
             }
-
             if (targetScreen == null)
-                targetScreen = Screen.PrimaryScreen;
+                targetScreen = System.Windows.Forms.Screen.PrimaryScreen;
+
+            string? splashScreenSetting = ConfigurationManager.AppSettings["ShowSplashScreen"];
+            if (splashScreenSetting != null && splashScreenSetting.ToLower() == "false")
+            {
+                var mainWindow = new MainWindow(targetScreen);
+                mainWindow.Show();
+                return;
+            }
+            string? splashDurationSetting = ConfigurationManager.AppSettings["SplashScreenDuration"];
 
             var splash = new SplashScreen();
             splash.Left = targetScreen.WorkingArea.Left + (targetScreen.WorkingArea.Width - splash.Width) / 2;
             splash.Top = targetScreen.WorkingArea.Top + (targetScreen.WorkingArea.Height - splash.Height) / 2;
             splash.Show();
-
             Task.Run(() =>
             {
-                System.Threading.Thread.Sleep(10000); // Simulate loading
-
+                System.Threading.Thread.Sleep(Convert.ToInt32(splashDurationSetting));
                 Dispatcher.Invoke(() =>
                 {
                     var mainWindow = new MainWindow(targetScreen);
@@ -49,5 +52,4 @@ namespace OPSKWA
             });
         }
     }
-
 }
