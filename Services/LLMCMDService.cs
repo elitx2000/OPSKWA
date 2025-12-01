@@ -1,9 +1,11 @@
-﻿using System;
+﻿using OPSKWA.Services.Utilities;
+using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using System.Configuration;
 using System.Windows.Controls;
 
 namespace OPSKWA
@@ -12,14 +14,17 @@ namespace OPSKWA
     {
         private List<String> _commands;
         private TerminalUtility _terminalUtility;
+        private OllamaClient _ollamaClient;
         public LLMCMDService(System.Windows.Controls.RichTextBox llmCmd_RTX)
         {
             _commands = new List<String>();
             _terminalUtility = new TerminalUtility(llmCmd_RTX);
+            _terminalUtility.Initialize();
             setCommands();
 
+            _ollamaClient = new OllamaClient();
+
             _terminalUtility.OnCommandEntered += HandleCommand;
-            //Temp:
             _terminalUtility.OnLLMPromptEntered += HandlePrompt;
         }
 
@@ -51,7 +56,7 @@ namespace OPSKWA
             switch (command)
             {
                 case "help":
-                    _terminalUtility.WriteInfo("Available commands:");
+                    _terminalUtility.WriteInfo("AVAILABLE COMMANDS:");
                     foreach (var cmd in _commands)
                     {
                         _terminalUtility.WriteSuccess($"  {cmd}");
@@ -62,11 +67,7 @@ namespace OPSKWA
                     _terminalUtility.WriteSuccess("Feed cleared");
                     break;
 
-                case "clearllm":
-                    _terminalUtility.WriteSuccess("LLM output cleared");
-                    break;
-
-                case "clearcmd":
+                case "clear":
                     _terminalUtility.Clear();
                     return; // Clear() already calls ShowPrompt, so return early
 
@@ -82,12 +83,32 @@ namespace OPSKWA
                     _terminalUtility.WriteError($"Command '{command}' recognized but not implemented yet");
                     break;
             }
-            _terminalUtility.ShowPromptWithoutClear();
+            //_terminalUtility.ShowPromptWithoutClear();
         }
-        private void HandlePrompt(string prompt)
+        private async void HandlePrompt(string prompt)
         {
-            // Temp handler for LLM prompts
-            _terminalUtility.WriteInfo($"LLM Prompt received: {prompt}");
+            //_terminalUtility.WriteInfo($"LLM Prompt received: {prompt}");
+            try
+            {
+                // Get AI response from Ollama
+                string response = await _ollamaClient.Generate(prompt);
+
+                // Display the AI response
+                _terminalUtility.WriteLLM($"AI: {response}");
+            }
+            catch (HttpRequestException httpEx)
+            {
+                _terminalUtility.WriteError($"Connection Error: Unable to reach Ollama at localhost:11434");
+                _terminalUtility.WriteError($"Make sure Ollama is running.");
+            }
+            catch (Exception ex)
+            {
+                _terminalUtility.WriteError($"Error: {ex.Message}");
+            }
+
+
+
+
             _terminalUtility.ShowPromptWithoutClear();
         }
     }

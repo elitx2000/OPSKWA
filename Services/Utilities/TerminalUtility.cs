@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -17,18 +18,39 @@ namespace OPSKWA
         public event Action<string>? OnCommandEntered;
         public event Action<string>? OnLLMPromptEntered;
 
-
+        private System.Windows.Media.SolidColorBrush _systemColor;
+        private System.Windows.Media.SolidColorBrush _userColor;
+        private System.Windows.Media.SolidColorBrush _llmColor;
+        private System.Windows.Media.SolidColorBrush _errBrushColor;
 
         public TerminalUtility(System.Windows.Controls.RichTextBox terminal)
         {
             _terminal = terminal;
             SetupEventHandlers();
+            SetupColorsFromConfig();
+        }
+        public void Initialize()
+        {
             ShowPrompt();
         }
 
         private void SetupEventHandlers()
         {
             _terminal.PreviewKeyDown += new System.Windows.Input.KeyEventHandler(OnPreviewKeyDown);
+        }
+        private void SetupColorsFromConfig()
+        {
+            var tempSysColor = ConfigurationManager.AppSettings["SystemColor"];
+            var tempUserColor = ConfigurationManager.AppSettings["UserColor"];
+            var tempLLMColor = ConfigurationManager.AppSettings["LLMColor"];
+            var tempSystemColor = ParseRgbToColor(tempSysColor ?? string.Empty);
+            var tempUsrColor = ParseRgbToColor(tempUserColor ?? string.Empty);
+            var tempLlmColor = ParseRgbToColor(tempLLMColor ?? string.Empty);
+
+            _systemColor = new SolidColorBrush(tempSystemColor);
+            _userColor = new SolidColorBrush(tempUsrColor);
+            _llmColor = new SolidColorBrush(tempLlmColor);
+            _errBrushColor = new SolidColorBrush(Colors.Red);
         }
         private void OnPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
@@ -43,7 +65,6 @@ namespace OPSKWA
                     return;
                 }
 
-                // Check if it's a command or LLM prompt
                 if (userInput.StartsWith("/"))
                 {
                     ProcessCommand(userInput);
@@ -80,7 +101,7 @@ namespace OPSKWA
             }
             var paragraph = new Paragraph();
             paragraph.Margin = new System.Windows.Thickness(0);
-            var promptRun = new Run(_prompt) { Foreground = System.Windows.Media.Brushes.LimeGreen };
+            var promptRun = new Run(_prompt) { Foreground = _systemColor};
             paragraph.Inlines.Add(promptRun);
 
             _terminal.Document.Blocks.Add(paragraph);
@@ -91,7 +112,7 @@ namespace OPSKWA
         {
             var paragraph = new Paragraph();
             paragraph.Margin = new System.Windows.Thickness(0);
-            var promptRun = new Run(_prompt) { Foreground = System.Windows.Media.Brushes.LimeGreen };
+            var promptRun = new Run(_prompt) { Foreground = _systemColor};
             paragraph.Inlines.Add(promptRun);
 
             _terminal.Document.Blocks.Add(paragraph);
@@ -128,11 +149,14 @@ namespace OPSKWA
         {
             OnLLMPromptEntered?.Invoke(prompt);
         }
-        public void WriteOutput(string text, System.Windows.Media.Brush color = null)
+        public void WriteOutput(string text, System.Windows.Media.SolidColorBrush? color = null)
         {
             var paragraph = new Paragraph();
             paragraph.Margin = new System.Windows.Thickness(0);
-            var run = new Run(text) { Foreground = color ?? System.Windows.Media.Brushes.White };
+            var run = new Run(text)
+            {
+                Foreground = color
+            };
             paragraph.Inlines.Add(run);
 
             _terminal.Document.Blocks.Add(paragraph);
@@ -141,20 +165,23 @@ namespace OPSKWA
         }
         public void WriteError(string text)
         {
-            WriteOutput(text, System.Windows.Media.Brushes.Red);
+            WriteOutput(text, _errBrushColor);
         }
         public void WriteSuccess(string text)
         {
-            WriteOutput(text, System.Windows.Media.Brushes.LimeGreen);
+            WriteOutput(text, _systemColor);
         }
         public void WriteInfo(string text)
         {
-            WriteOutput(text, System.Windows.Media.Brushes.Cyan);
+            WriteOutput(text, _systemColor);
+        }
+        public void WriteLLM(string text)
+        {
+            WriteOutput(text, _llmColor);
         }
         public void Clear()
         {
             _terminal.Document.Blocks.Clear();
-            ShowPrompt();
         }
         private bool IsCaretAtPrompt()
         {
@@ -174,6 +201,20 @@ namespace OPSKWA
                     _terminal.CaretPosition = paragraph.ContentStart.GetPositionAtOffset(_prompt.Length);
                 }
             }
+        }
+        private System.Windows.Media.Color ParseRgbToColor(string rgbString)
+        {
+            if (string.IsNullOrEmpty(rgbString))
+                return Colors.White;
+
+            var rgb = rgbString.Split(',').Select(c => byte.Parse(c.Trim())).ToArray();
+
+            if (rgb.Length == 3)
+            {
+                return System.Windows.Media.Color.FromRgb(rgb[0], rgb[1], rgb[2]);
+            }
+
+            return Colors.White; 
         }
     }
 }
