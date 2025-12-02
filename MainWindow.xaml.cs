@@ -32,7 +32,7 @@ namespace OPSKWA
             this.Loaded += (sender, e) =>
             {
                 this.WindowState = WindowState.Maximized;
-                _opskwaController.Initilize();
+                _opskwaController.Initialize();
             };
         }
     }
